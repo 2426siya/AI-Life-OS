@@ -46,7 +46,7 @@ export default function Dashboard({ onBack }: DashboardProps) {
     }
 
     // Fetch user preferences / stats
-    fetch("http://localhost:8000/api/preferences")
+    fetch("/api/preferences")
       .then((res) => {
         if (!res.ok) throw new Error();
         return res.json();

@@ -32,7 +32,7 @@ export default function GoalsTab({ apiError }: GoalsTabProps) {
   const [expandedGoalId, setExpandedGoalId] = useState<number | null>(null);
 
   const fetchGoals = () => {
-    fetch("http://localhost:8000/api/goals")
+    fetch("/api/goals")
       .then((res) => {
         if (!res.ok) throw new Error();
         return res.json();
@@ -125,7 +125,7 @@ export default function GoalsTab({ apiError }: GoalsTabProps) {
       setGoals([mockGoal, ...goals]);
       resetForm();
     } else {
-      fetch("http://localhost:8000/api/goals", {
+      fetch("/api/goals", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(newGoalData)
@@ -155,7 +155,7 @@ export default function GoalsTab({ apiError }: GoalsTabProps) {
     if (apiError) {
       setGoals(goals.filter(g => g.id !== goalId));
     } else {
-      fetch(`http://localhost:8000/api/goals/${goalId}`, {
+      fetch(`/api/goals/${goalId}`, {
         method: "DELETE"
       })
       .then((res) => {

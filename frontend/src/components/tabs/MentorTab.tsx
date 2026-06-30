@@ -76,7 +76,7 @@ export default function MentorTab({ apiError, userData }: MentorTabProps) {
         setLoading(false);
       }, 800);
     } else {
-      fetch("http://localhost:8000/api/mentor", {
+      fetch("/api/mentor", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -102,7 +102,7 @@ export default function MentorTab({ apiError, userData }: MentorTabProps) {
     const updatedPref = { interests, preparing_for: prepFor };
     
     if (!apiError) {
-      fetch("http://localhost:8000/api/preferences", {
+      fetch("/api/preferences", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(updatedPref)

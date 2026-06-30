@@ -21,7 +21,7 @@ export default function OverviewTab({ apiError }: OverviewTabProps) {
   const [loading, setLoading] = useState<boolean>(true);
 
   const fetchOverview = () => {
-    fetch("http://localhost:8000/api/dashboard")
+    fetch("/api/dashboard")
       .then((res) => {
         if (!res.ok) throw new Error();
         return res.json();
@@ -79,7 +79,7 @@ export default function OverviewTab({ apiError }: OverviewTabProps) {
     });
 
     if (!apiError) {
-      fetch(`http://localhost:8000/api/tasks/${taskId}`, {
+      fetch(`/api/tasks/${taskId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: nextStatus })

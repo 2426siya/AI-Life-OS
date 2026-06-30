@@ -21,7 +21,7 @@ export default function PlannerTab({ apiError }: PlannerTabProps) {
   const [showWarning, setShowWarning] = useState<string | null>(null);
 
   const fetchTasks = () => {
-    fetch("http://localhost:8000/api/tasks")
+    fetch("/api/tasks")
       .then((res) => {
         if (!res.ok) throw new Error();
         return res.json();
@@ -81,7 +81,7 @@ export default function PlannerTab({ apiError }: PlannerTabProps) {
     setTasks(tasks.map(t => t.id === task.id ? { ...t, status: nextStatus } : t));
 
     if (!apiError) {
-      fetch(`http://localhost:8000/api/tasks/${task.id}`, {
+      fetch(`/api/tasks/${task.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: nextStatus })

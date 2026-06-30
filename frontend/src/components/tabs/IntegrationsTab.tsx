@@ -15,7 +15,7 @@ export default function IntegrationsTab() {
 
   useEffect(() => {
     // Fetch mock integrations data from backend
-    const f1 = fetch("http://localhost:8000/api/integrations/github").then(res => res.json()).catch(() => ({
+    const f1 = fetch("/api/integrations/github").then(res => res.json()).catch(() => ({
       username: "sunilkale",
       commits_today: 3,
       open_prs: 2,
@@ -24,7 +24,7 @@ export default function IntegrationsTab() {
       contributions_week: [1, 3, 0, 4, 2, 3, 1]
     }));
 
-    const f2 = fetch("http://localhost:8000/api/integrations/calendar").then(res => res.json()).catch(() => ({
+    const f2 = fetch("/api/integrations/calendar").then(res => res.json()).catch(() => ({
       provider: "Google Calendar",
       events: [
         { title: "Algorithms Class", time: "09:00 - 10:30", status: "Busy" },

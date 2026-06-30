@@ -15,7 +15,7 @@ export default function PortfolioTab({}: PortfolioTabProps) {
 
 
   useEffect(() => {
-    fetch("http://localhost:8000/api/portfolio")
+    fetch("/api/portfolio")
       .then((res) => {
         if (!res.ok) throw new Error();
         return res.json();

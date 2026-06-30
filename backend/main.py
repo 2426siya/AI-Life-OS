@@ -1,6 +1,9 @@
 import datetime
+import os
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from typing import List, Dict, Any, Optional
 
@@ -709,3 +712,26 @@ def get_calendar_integration():
             {"title": "ML Group Meeting", "time": "14:00 - 15:00", "status": "Tentative"}
         ]
     }
+
+# --- Static Files Serving (Unified Deployment) ---
+
+frontend_dist_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "frontend", "dist")
+
+if os.path.exists(frontend_dist_path):
+    # Serve assets folder
+    assets_path = os.path.join(frontend_dist_path, "assets")
+    if os.path.exists(assets_path):
+        app.mount("/assets", StaticFiles(directory=assets_path), name="assets")
+        
+    # Serve public assets directory if it exists
+    app.mount("/static", StaticFiles(directory=frontend_dist_path), name="static")
+
+    # Serve index.html for all non-API path visits (SPA routing)
+    @app.get("/{catchall:path}")
+    def read_index(catchall: str):
+        # Skip API endpoints to return normal 404
+        if catchall.startswith("api"):
+            raise HTTPException(status_code=404, detail="API endpoint not found")
+        # Return index.html from React build
+        return FileResponse(os.path.join(frontend_dist_path, "index.html"))
+

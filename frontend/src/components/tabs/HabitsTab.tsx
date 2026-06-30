@@ -20,7 +20,7 @@ export default function HabitsTab({ apiError }: HabitsTabProps) {
   const [newHabitName, setNewHabitName] = useState<string>("");
 
   const fetchHabits = () => {
-    fetch("http://localhost:8000/api/habits")
+    fetch("/api/habits")
       .then((res) => {
         if (!res.ok) throw new Error();
         return res.json();
@@ -61,7 +61,7 @@ export default function HabitsTab({ apiError }: HabitsTabProps) {
       setHabits([...habits, mockH]);
       setNewHabitName("");
     } else {
-      fetch("http://localhost:8000/api/habits", {
+      fetch("/api/habits", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: newHabitName })
@@ -100,7 +100,7 @@ export default function HabitsTab({ apiError }: HabitsTabProps) {
     setHabits(updated);
 
     if (!apiError) {
-      fetch(`http://localhost:8000/api/habits/${habitId}/complete`, {
+      fetch(`/api/habits/${habitId}/complete`, {
         method: "POST"
       })
       .then(res => {
