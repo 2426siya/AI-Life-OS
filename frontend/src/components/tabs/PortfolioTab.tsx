@@ -26,8 +26,9 @@ export default function PortfolioTab({}: PortfolioTabProps) {
       })
       .catch(() => {
         // Fallback Mock Portfolio Data
+        const fallbackName = localStorage.getItem("username") || "Developer";
         setData({
-          name: "Sunil Kale",
+          name: fallbackName.charAt(0).toUpperCase() + fallbackName.slice(1),
           title: "Software Engineer & AI Enthusiast",
           bio: "3rd-year AI & Data Science student. Contributor to open-source workflows. Architecting systems that optimize human energy, planning, and goal execution.",
           interests: ["AI/DS", "Open Source", "Web Dev"],

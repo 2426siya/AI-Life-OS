@@ -16,6 +16,8 @@ interface OverviewTabProps {
 }
 
 export default function OverviewTab({ apiError }: OverviewTabProps) {
+  const username = localStorage.getItem("username") || "User";
+  const displayName = username.charAt(0).toUpperCase() + username.slice(1);
 
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -107,7 +109,7 @@ export default function OverviewTab({ apiError }: OverviewTabProps) {
         <div className="absolute right-4 top-1/2 -translate-y-1/2 opacity-10">
           <Sparkles size={120} className="text-violet-500" />
         </div>
-        <h1 className="text-3xl font-extrabold tracking-tight">Welcome back, Sunil.</h1>
+        <h1 className="text-3xl font-extrabold tracking-tight">Welcome back, {displayName}.</h1>
         <p className="text-gray-400 mt-2 text-sm max-w-xl">
           Your Smart planner has optimized today's agenda. Based on your peak energy scores and milestone deadlines, you have 4 tasks scheduled today.
         </p>
