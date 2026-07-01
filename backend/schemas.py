@@ -199,3 +199,21 @@ class PortfolioOut(BaseModel):
     milestones: List[dict]
     projects: List[PortfolioProject]
     achievements: List[dict]
+
+# --- Authentication ---
+class UserSignup(BaseModel):
+    username: str
+    email: str
+    password: str
+    interests: Optional[str] = None
+    preparing_for: Optional[str] = None
+    open_source_status: Optional[str] = None
+    energy_morning: Optional[str] = None
+    energy_afternoon: Optional[str] = None
+    energy_night: Optional[str] = None
+    available_hours: Optional[float] = None
+
+class UserLogin(BaseModel):
+    username_or_email: str
+    password: str
+

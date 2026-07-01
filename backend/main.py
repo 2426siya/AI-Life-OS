@@ -9,6 +9,7 @@ from typing import List, Dict, Any, Optional
 
 from backend.database import engine, get_db, Base
 from backend import models, schemas, ai_engine
+from backend.auth import get_current_user, get_password_hash, verify_password, create_access_token
 
 app = FastAPI(title="Nexus AI - AI Life Operating System API")
 
@@ -24,11 +25,10 @@ app.add_middleware(
 # Initialize database tables
 Base.metadata.create_all(bind=engine)
 
-# Seed database on startup if empty
+# Seed database on startup (Only Achievements, which are global)
 @app.on_event("startup")
 def seed_database():
     db = next(get_db())
-    # 1. Seed Achievements
     if db.query(models.Achievement).count() == 0:
         achievements = [
             models.Achievement(name="First PR", description="Merged your first GitHub pull request.", icon="🏆"),
@@ -39,97 +39,142 @@ def seed_database():
         db.add_all(achievements)
         db.commit()
 
-    # 2. Seed Habits
-    if db.query(models.Habit).count() == 0:
-        habits = [
-            models.Habit(name="GitHub Contribution", current_streak=17, best_streak=25, last_completed=(datetime.date.today() - datetime.timedelta(days=1)).strftime("%Y-%m-%d")),
-            models.Habit(name="Daily Exercise", current_streak=5, best_streak=12, last_completed=(datetime.date.today() - datetime.timedelta(days=1)).strftime("%Y-%m-%d")),
-            models.Habit(name="DSA / LeetCode", current_streak=8, best_streak=15, last_completed=(datetime.date.today() - datetime.timedelta(days=1)).strftime("%Y-%m-%d")),
-            models.Habit(name="Reading", current_streak=3, best_streak=7, last_completed=(datetime.date.today() - datetime.timedelta(days=1)).strftime("%Y-%m-%d")),
-            models.Habit(name="Coding", current_streak=12, best_streak=20, last_completed=(datetime.date.today() - datetime.timedelta(days=1)).strftime("%Y-%m-%d")),
-        ]
-        db.add_all(habits)
+def seed_user_data(db: Session, user_id: int):
+    """Seed sample habits, goals, milestones and tasks for a newly registered user."""
+    # 1. Seed Habits
+    habits = [
+        models.Habit(user_id=user_id, name="GitHub Contribution", current_streak=17, best_streak=25, last_completed=(datetime.date.today() - datetime.timedelta(days=1)).strftime("%Y-%m-%d")),
+        models.Habit(user_id=user_id, name="Daily Exercise", current_streak=5, best_streak=12, last_completed=(datetime.date.today() - datetime.timedelta(days=1)).strftime("%Y-%m-%d")),
+        models.Habit(user_id=user_id, name="DSA / LeetCode", current_streak=8, best_streak=15, last_completed=(datetime.date.today() - datetime.timedelta(days=1)).strftime("%Y-%m-%d")),
+        models.Habit(user_id=user_id, name="Reading", current_streak=3, best_streak=7, last_completed=(datetime.date.today() - datetime.timedelta(days=1)).strftime("%Y-%m-%d")),
+        models.Habit(user_id=user_id, name="Coding", current_streak=12, best_streak=20, last_completed=(datetime.date.today() - datetime.timedelta(days=1)).strftime("%Y-%m-%d")),
+    ]
+    db.add_all(habits)
+    db.commit()
+
+    # 2. Seed a default goal
+    deadline = (datetime.date.today() + datetime.timedelta(days=250)).strftime("%Y-%m-%d")
+    goal = models.Goal(
+        user_id=user_id,
+        title="Get selected for GSoC 2027",
+        description="Contribute to open source organizations, build a solid proposal, and get selected.",
+        deadline=deadline,
+        priority="High",
+        status="In Progress",
+        progress=25.0
+    )
+    db.add(goal)
+    db.commit()
+    db.refresh(goal)
+    
+    # Add Milestones and Tasks using the AI engine
+    decomp = ai_engine.decompose_goal(goal.title, goal.priority)
+    for m_data in decomp["milestones"]:
+        milestone = models.Milestone(
+            goal_id=goal.id,
+            title=m_data["title"],
+            duration=m_data["duration"],
+            status="Pending" if m_data["order"] > 1 else "In Progress",
+            order=m_data["order"]
+        )
+        db.add(milestone)
+        db.commit()
+        db.refresh(milestone)
+        
+        # Add tasks
+        for t_idx, t_data in enumerate(m_data["tasks"]):
+            due_days = (milestone.order - 1) * 14 + t_idx * 2
+            task_due = (datetime.date.today() + datetime.timedelta(days=due_days)).strftime("%Y-%m-%d")
+            
+            task = models.Task(
+                title=t_data["title"],
+                duration_minutes=t_data["duration"],
+                energy_required=t_data["energy"],
+                due_date=task_due,
+                milestone_id=milestone.id,
+                status="Completed" if (milestone.order == 1 and t_idx == 0) else "Pending",
+                priority_score=ai_engine.calculate_priority_score(
+                    t_data["title"], goal.priority, task_due, 0, True
+                )
+            )
+            db.add(task)
+        db.commit()
+    
+    # Link dependency (First PR task depends on Git task)
+    git_task = db.query(models.Task).join(models.Milestone).join(models.Goal).filter(
+        models.Goal.user_id == user_id,
+        models.Task.title.like("%Configure Git%")
+    ).first()
+    pr_task = db.query(models.Task).join(models.Milestone).join(models.Goal).filter(
+        models.Goal.user_id == user_id,
+        models.Task.title.like("%Submit first Pull Request%")
+    ).first()
+    if git_task and pr_task:
+        pr_task.dependencies.append(git_task)
         db.commit()
 
-    # 3. Seed User Preferences
-    if db.query(models.UserPreference).count() == 0:
-        pref = models.UserPreference(
-            interests="AI/DS, Open Source, Web Dev",
-            preparing_for="GSoC 2027, Germany MS",
-            open_source_status="Active Contributor",
-            energy_morning="High",
-            energy_afternoon="Medium",
-            energy_night="Low",
-            available_hours=4.0
-        )
-        db.add(pref)
-        db.commit()
-        
-    # 4. Seed a default goal to make the app look alive immediately
-    if db.query(models.Goal).count() == 0:
-        # Create "Get selected for GSoC 2027" goal
-        deadline = (datetime.date.today() + datetime.timedelta(days=250)).strftime("%Y-%m-%d")
-        goal = models.Goal(
-            title="Get selected for GSoC 2027",
-            description="Contribute to open source organizations, build a solid proposal, and get selected.",
-            deadline=deadline,
-            priority="High",
-            status="In Progress",
-            progress=25.0
-        )
-        db.add(goal)
-        db.commit()
-        db.refresh(goal)
-        
-        # Add Milestones and Tasks using the AI engine
-        decomp = ai_engine.decompose_goal(goal.title, goal.priority)
-        for m_data in decomp["milestones"]:
-            milestone = models.Milestone(
-                goal_id=goal.id,
-                title=m_data["title"],
-                duration=m_data["duration"],
-                status="Pending" if m_data["order"] > 1 else "In Progress",
-                order=m_data["order"]
-            )
-            db.add(milestone)
-            db.commit()
-            db.refresh(milestone)
-            
-            # Add tasks
-            for t_idx, t_data in enumerate(m_data["tasks"]):
-                # Spread task due dates based on order
-                due_days = (milestone.order - 1) * 14 + t_idx * 2
-                task_due = (datetime.date.today() + datetime.timedelta(days=due_days)).strftime("%Y-%m-%d")
-                
-                task = models.Task(
-                    title=t_data["title"],
-                    duration_minutes=t_data["duration"],
-                    energy_required=t_data["energy"],
-                    due_date=task_due,
-                    milestone_id=milestone.id,
-                    status="Completed" if (milestone.order == 1 and t_idx == 0) else "Pending",
-                    priority_score=ai_engine.calculate_priority_score(
-                        t_data["title"], goal.priority, task_due, 0, True
-                    )
-                )
-                db.add(task)
-            db.commit()
-        
-        # Link dependency (First PR task depends on Git task)
-        # Find Git task and First PR task in database
-        git_task = db.query(models.Task).filter(models.Task.title.like("%Configure Git%")).first()
-        pr_task = db.query(models.Task).filter(models.Task.title.like("%Submit first Pull Request%")).first()
-        if git_task and pr_task:
-            pr_task.dependencies.append(git_task)
-            db.commit()
+# --- Auth Endpoints ---
+
+@app.post("/api/auth/signup")
+def signup(user_data: schemas.UserSignup, db: Session = Depends(get_db)):
+    if db.query(models.User).filter(models.User.username == user_data.username).first():
+        raise HTTPException(status_code=400, detail="Username already exists")
+    if db.query(models.User).filter(models.User.email == user_data.email).first():
+        raise HTTPException(status_code=400, detail="Email already exists")
+    
+    hashed_password = get_password_hash(user_data.password)
+    db_user = models.User(
+        username=user_data.username,
+        email=user_data.email,
+        hashed_password=hashed_password
+    )
+    db.add(db_user)
+    db.commit()
+    db.refresh(db_user)
+
+    # Save user preferences
+    pref = models.UserPreference(
+        user_id=db_user.id,
+        interests=user_data.interests or "AI/DS, Open Source",
+        preparing_for=user_data.preparing_for or "Germany MS, GSoC",
+        open_source_status=user_data.open_source_status or "Active Contributor",
+        energy_morning=user_data.energy_morning or "High",
+        energy_afternoon=user_data.energy_afternoon or "Medium",
+        energy_night=user_data.energy_night or "Low",
+        available_hours=user_data.available_hours or 4.0
+    )
+    db.add(pref)
+    db.commit()
+
+    # Seed default sample data for this user
+    try:
+        seed_user_data(db, db_user.id)
+    except Exception as e:
+        print(f"Error seeding user data: {e}")
+
+    access_token = create_access_token(data={"sub": db_user.username})
+    return {"access_token": access_token, "token_type": "bearer", "username": db_user.username}
+
+@app.post("/api/auth/login")
+def login(user_data: schemas.UserLogin, db: Session = Depends(get_db)):
+    db_user = db.query(models.User).filter(
+        (models.User.username == user_data.username_or_email) | 
+        (models.User.email == user_data.username_or_email)
+    ).first()
+    if not db_user or not verify_password(user_data.password, db_user.hashed_password):
+        raise HTTPException(status_code=400, detail="Invalid username or password")
+    
+    access_token = create_access_token(data={"sub": db_user.username})
+    return {"access_token": access_token, "token_type": "bearer", "username": db_user.username}
 
 
 # --- Goals Endpoints ---
 
 @app.post("/api/goals", response_model=schemas.GoalOut)
-def create_goal(goal_in: schemas.GoalCreate, db: Session = Depends(get_db)):
+def create_goal(goal_in: schemas.GoalCreate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     # Create goal
     goal = models.Goal(
+        user_id=current_user.id,
         title=goal_in.title,
         description=goal_in.description,
         deadline=goal_in.deadline,
@@ -183,19 +228,19 @@ def create_goal(goal_in: schemas.GoalCreate, db: Session = Depends(get_db)):
     return goal
 
 @app.get("/api/goals", response_model=List[schemas.GoalOut])
-def get_goals(db: Session = Depends(get_db)):
-    return db.query(models.Goal).all()
+def get_goals(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    return db.query(models.Goal).filter(models.Goal.user_id == current_user.id).all()
 
 @app.get("/api/goals/{goal_id}", response_model=schemas.GoalOut)
-def get_goal(goal_id: int, db: Session = Depends(get_db)):
-    goal = db.query(models.Goal).filter(models.Goal.id == goal_id).first()
+def get_goal(goal_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    goal = db.query(models.Goal).filter(models.Goal.id == goal_id, models.Goal.user_id == current_user.id).first()
     if not goal:
         raise HTTPException(status_code=404, detail="Goal not found")
     return goal
 
 @app.put("/api/goals/{goal_id}", response_model=schemas.GoalOut)
-def update_goal(goal_id: int, goal_in: schemas.GoalUpdate, db: Session = Depends(get_db)):
-    goal = db.query(models.Goal).filter(models.Goal.id == goal_id).first()
+def update_goal(goal_id: int, goal_in: schemas.GoalUpdate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    goal = db.query(models.Goal).filter(models.Goal.id == goal_id, models.Goal.user_id == current_user.id).first()
     if not goal:
         raise HTTPException(status_code=404, detail="Goal not found")
         
@@ -208,8 +253,8 @@ def update_goal(goal_id: int, goal_in: schemas.GoalUpdate, db: Session = Depends
     return goal
 
 @app.delete("/api/goals/{goal_id}")
-def delete_goal(goal_id: int, db: Session = Depends(get_db)):
-    goal = db.query(models.Goal).filter(models.Goal.id == goal_id).first()
+def delete_goal(goal_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    goal = db.query(models.Goal).filter(models.Goal.id == goal_id, models.Goal.user_id == current_user.id).first()
     if not goal:
         raise HTTPException(status_code=404, detail="Goal not found")
     db.delete(goal)
@@ -220,13 +265,17 @@ def delete_goal(goal_id: int, db: Session = Depends(get_db)):
 # --- Tasks Endpoints ---
 
 @app.post("/api/tasks", response_model=schemas.TaskOut)
-def create_task(task_in: schemas.TaskCreate, db: Session = Depends(get_db)):
+def create_task(task_in: schemas.TaskCreate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     # Calculate initial priority score
     goal_priority = "Medium"
     if task_in.milestone_id:
-        milestone = db.query(models.Milestone).filter(models.Milestone.id == task_in.milestone_id).first()
-        if milestone and milestone.goal:
-            goal_priority = milestone.goal.priority
+        milestone = db.query(models.Milestone).join(models.Goal).filter(
+            models.Milestone.id == task_in.milestone_id,
+            models.Goal.user_id == current_user.id
+        ).first()
+        if not milestone:
+            raise HTTPException(status_code=400, detail="Milestone not found")
+        goal_priority = milestone.goal.priority
             
     priority = ai_engine.calculate_priority_score(
         task_in.title, goal_priority, task_in.due_date, 0, True
@@ -260,8 +309,10 @@ def create_task(task_in: schemas.TaskCreate, db: Session = Depends(get_db)):
     )
 
 @app.get("/api/tasks", response_model=List[schemas.TaskOut])
-def get_tasks(db: Session = Depends(get_db)):
-    tasks = db.query(models.Task).all()
+def get_tasks(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    tasks = db.query(models.Task).join(models.Milestone).join(models.Goal).filter(
+        models.Goal.user_id == current_user.id
+    ).all()
     out = []
     for t in tasks:
         out.append(schemas.TaskOut(
@@ -279,8 +330,11 @@ def get_tasks(db: Session = Depends(get_db)):
     return out
 
 @app.put("/api/tasks/{task_id}", response_model=schemas.TaskOut)
-def update_task(task_id: int, task_in: schemas.TaskUpdate, db: Session = Depends(get_db)):
-    task = db.query(models.Task).filter(models.Task.id == task_id).first()
+def update_task(task_id: int, task_in: schemas.TaskUpdate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    task = db.query(models.Task).join(models.Milestone).join(models.Goal).filter(
+        models.Task.id == task_id,
+        models.Goal.user_id == current_user.id
+    ).first()
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
         
@@ -344,9 +398,15 @@ def update_task(task_id: int, task_in: schemas.TaskUpdate, db: Session = Depends
     )
 
 @app.post("/api/tasks/{task_id}/dependencies", response_model=schemas.TaskOut)
-def add_dependency(task_id: int, depends_on_id: int, db: Session = Depends(get_db)):
-    task = db.query(models.Task).filter(models.Task.id == task_id).first()
-    dep_task = db.query(models.Task).filter(models.Task.id == depends_on_id).first()
+def add_dependency(task_id: int, depends_on_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    task = db.query(models.Task).join(models.Milestone).join(models.Goal).filter(
+        models.Task.id == task_id,
+        models.Goal.user_id == current_user.id
+    ).first()
+    dep_task = db.query(models.Task).join(models.Milestone).join(models.Goal).filter(
+        models.Task.id == depends_on_id,
+        models.Goal.user_id == current_user.id
+    ).first()
     
     if not task or not dep_task:
         raise HTTPException(status_code=404, detail="Task not found")
@@ -380,24 +440,28 @@ def add_dependency(task_id: int, depends_on_id: int, db: Session = Depends(get_d
 # --- Habits Endpoints ---
 
 @app.get("/api/habits", response_model=List[schemas.HabitOut])
-def get_habits(db: Session = Depends(get_db)):
-    return db.query(models.Habit).all()
+def get_habits(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    return db.query(models.Habit).filter(models.Habit.user_id == current_user.id).all()
 
 @app.post("/api/habits", response_model=schemas.HabitOut)
-def create_habit(habit_in: schemas.HabitCreate, db: Session = Depends(get_db)):
-    habit = models.Habit(name=habit_in.name, current_streak=0, best_streak=0)
-    db.add(habit)
-    try:
-        db.commit()
-        db.refresh(habit)
-    except Exception:
-        db.rollback()
+def create_habit(habit_in: schemas.HabitCreate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    # Check if user already has a habit with the same name
+    existing = db.query(models.Habit).filter(
+        models.Habit.user_id == current_user.id,
+        models.Habit.name == habit_in.name
+    ).first()
+    if existing:
         raise HTTPException(status_code=400, detail="Habit with this name already exists")
+
+    habit = models.Habit(user_id=current_user.id, name=habit_in.name, current_streak=0, best_streak=0)
+    db.add(habit)
+    db.commit()
+    db.refresh(habit)
     return habit
 
 @app.post("/api/habits/{habit_id}/complete", response_model=schemas.HabitOut)
-def complete_habit(habit_id: int, db: Session = Depends(get_db)):
-    habit = db.query(models.Habit).filter(models.Habit.id == habit_id).first()
+def complete_habit(habit_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    habit = db.query(models.Habit).filter(models.Habit.id == habit_id, models.Habit.user_id == current_user.id).first()
     if not habit:
         raise HTTPException(status_code=404, detail="Habit not found")
         
@@ -434,11 +498,11 @@ def complete_habit(habit_id: int, db: Session = Depends(get_db)):
 # --- Smart Planner & Dashboard Overview Endpoints ---
 
 @app.get("/api/dashboard", response_model=schemas.DashboardOverview)
-def get_dashboard_overview(db: Session = Depends(get_db)):
+def get_dashboard_overview(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     today_str = datetime.date.today().strftime("%Y-%m-%d")
     
     # 1. Fetch preferences
-    pref = db.query(models.UserPreference).first()
+    pref = db.query(models.UserPreference).filter(models.UserPreference.user_id == current_user.id).first()
     available_hours = pref.available_hours if pref else 4.0
     energy_pref = {
         "morning": pref.energy_morning if pref else "High",
@@ -447,7 +511,9 @@ def get_dashboard_overview(db: Session = Depends(get_db)):
     }
     
     # 2. Fetch today's tasks (due today, pending, or overdue)
-    all_tasks = db.query(models.Task).all()
+    all_tasks = db.query(models.Task).join(models.Milestone).join(models.Goal).filter(
+        models.Goal.user_id == current_user.id
+    ).all()
     today_tasks = []
     overdue_tasks = []
     
@@ -486,7 +552,7 @@ def get_dashboard_overview(db: Session = Depends(get_db)):
     
     # 4. Progress Predictions
     predictions = []
-    goals = db.query(models.Goal).all()
+    goals = db.query(models.Goal).filter(models.Goal.user_id == current_user.id).all()
     for g in goals:
         if g.status != "Completed":
             # Pace prediction
@@ -532,7 +598,7 @@ def get_dashboard_overview(db: Session = Depends(get_db)):
                     })
                     
     # 5. Streak calculation (from habits)
-    habits = db.query(models.Habit).all()
+    habits = db.query(models.Habit).filter(models.Habit.user_id == current_user.id).all()
     max_streak = max([h.current_streak for h in habits]) if habits else 0
 
     # Sort today's tasks by priority score
@@ -574,15 +640,15 @@ def get_dashboard_overview(db: Session = Depends(get_db)):
 # --- User Preferences & AI Memory Endpoints ---
 
 @app.get("/api/preferences", response_model=schemas.UserPreferenceOut)
-def get_preferences(db: Session = Depends(get_db)):
-    pref = db.query(models.UserPreference).first()
+def get_preferences(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    pref = db.query(models.UserPreference).filter(models.UserPreference.user_id == current_user.id).first()
     if not pref:
         raise HTTPException(status_code=404, detail="Preferences not found")
     return pref
 
 @app.put("/api/preferences", response_model=schemas.UserPreferenceOut)
-def update_preferences(pref_in: schemas.UserPreferenceUpdate, db: Session = Depends(get_db)):
-    pref = db.query(models.UserPreference).first()
+def update_preferences(pref_in: schemas.UserPreferenceUpdate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    pref = db.query(models.UserPreference).filter(models.UserPreference.user_id == current_user.id).first()
     if not pref:
         raise HTTPException(status_code=404, detail="Preferences not found")
         
@@ -598,8 +664,8 @@ def update_preferences(pref_in: schemas.UserPreferenceUpdate, db: Session = Depe
 # --- AI Mentor Endpoints ---
 
 @app.post("/api/mentor", response_model=schemas.MentorChatResponse)
-def mentor_chat(chat_in: schemas.MentorChatInput, db: Session = Depends(get_db)):
-    pref = db.query(models.UserPreference).first()
+def mentor_chat(chat_in: schemas.MentorChatInput, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    pref = db.query(models.UserPreference).filter(models.UserPreference.user_id == current_user.id).first()
     memory = {
         "interests": pref.interests if pref else "",
         "preparing_for": pref.preparing_for if pref else "",
@@ -624,13 +690,13 @@ def mentor_chat(chat_in: schemas.MentorChatInput, db: Session = Depends(get_db))
 # --- Portfolio Endpoints ---
 
 @app.get("/api/portfolio", response_model=schemas.PortfolioOut)
-def get_portfolio(db: Session = Depends(get_db)):
-    pref = db.query(models.UserPreference).first()
-    goals = db.query(models.Goal).all()
+def get_portfolio(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    pref = db.query(models.UserPreference).filter(models.UserPreference.user_id == current_user.id).first()
+    goals = db.query(models.Goal).filter(models.Goal.user_id == current_user.id).all()
     achievements = db.query(models.Achievement).filter(models.Achievement.unlocked_at != None).all()
     
-    interests_list = [i.strip() for i in pref.interests.split(",")] if pref and pref.interests else ["AI/DS"]
-    prep_list = [p.strip() for p in pref.preparing_for.split(",")] if pref and pref.preparing_for else ["Germany MS"]
+    interests_list = [i.strip() for i in pref.interests.split(",")] if pref and pref.interests else []
+    prep_list = [p.strip() for p in pref.preparing_for.split(",")] if pref and pref.preparing_for else []
     
     # Extract completed milestones or projects
     milestones_done = []
@@ -650,23 +716,25 @@ def get_portfolio(db: Session = Depends(get_db)):
             projects.append(schemas.PortfolioProject(
                 title=g.title,
                 description=g.description or "A primary career development roadmap tracked in the AI Life Operating System.",
-                tech_stack=["React", "Python", "FastAPI", "SQLite"] if "gsoc" in g.title.lower() or "dsa" in g.title.lower() else ["Research", "DAAD", "IELTS"],
-                github_link="https://github.com/sunilkale" if "gsoc" in g.title.lower() else None
+                tech_stack=["React", "Python", "FastAPI", "PostgreSQL"] if "gsoc" in g.title.lower() or "dsa" in g.title.lower() else ["Research", "IELTS"],
+                github_link=None
             ))
             
     # Add a mock project if empty
     if not projects:
         projects.append(schemas.PortfolioProject(
-            title="Nexus AI Life Operating System",
-            description="Built a comprehensive scheduling, planning and career-oriented productivity platform with SQLite and FastAPI.",
-            tech_stack=["React", "Vite", "FastAPI", "Tailwind CSS", "SQLAlchemy"],
-            github_link="https://github.com/sunilkale/nexus-life-os"
+            title="My AI Life OS Roadmap",
+            description="Active career planner and energy optimizer setup to coordinate day-to-day milestones.",
+            tech_stack=["React", "Vite", "FastAPI", "PostgreSQL", "SQLAlchemy"],
+            github_link=None
         ))
 
+    bio_str = f"A dedicated learner with interests in {pref.interests}. Preparing for {pref.preparing_for}." if pref else "AI Life OS dashboard user."
+
     return schemas.PortfolioOut(
-        name="Sunil Kale",
-        title="Software Engineer & AI Enthusiast",
-        bio="3rd-year AI & Data Science student. Contributor to open-source workflows. Architecting systems that optimize human energy, planning, and goal execution.",
+        name=current_user.username.capitalize(),
+        title="Software Engineer & AI Enthusiast" if (pref and "ai" in pref.interests.lower()) else "Life OS Platform User",
+        bio=bio_str,
         interests=interests_list,
         preparing_for=prep_list,
         github_stats={
@@ -684,13 +752,13 @@ def get_portfolio(db: Session = Depends(get_db)):
 # --- Integrations Endpoints ---
 
 @app.get("/api/integrations/github")
-def get_github_integration():
+def get_github_integration(current_user: models.User = Depends(get_current_user)):
     """
     Mock GitHub API endpoint returning developer streak and contribution levels.
     """
     return {
         "connected": True,
-        "username": "sunilkale",
+        "username": current_user.username,
         "commits_today": 3,
         "open_prs": 2,
         "issues_solved": 1,
@@ -699,7 +767,7 @@ def get_github_integration():
     }
 
 @app.get("/api/integrations/calendar")
-def get_calendar_integration():
+def get_calendar_integration(current_user: models.User = Depends(get_current_user)):
     """
     Mock Google/Outlook Calendar synchronization status and today's schedule events.
     """

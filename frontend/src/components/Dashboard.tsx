@@ -28,6 +28,8 @@ interface DashboardProps {
 }
 
 export default function Dashboard({ onBack }: DashboardProps) {
+  const username = localStorage.getItem("username") || "User";
+  const initials = username.slice(0, 2).toUpperCase();
   const [activeTab, setActiveTab] = useState<string>("overview");
   const [userData, setUserData] = useState<any>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -122,11 +124,11 @@ export default function Dashboard({ onBack }: DashboardProps) {
         <div className="p-4 border-t border-white/10 bg-[#08080A]">
           <div className="flex items-center gap-3 mb-3">
             <div className="h-10 w-10 rounded-full bg-gradient-to-tr from-violet-600 to-cyan-400 flex items-center justify-center font-bold">
-              SK
+              {initials}
             </div>
             <div className="overflow-hidden">
-              <h4 className="font-bold text-sm truncate">Sunil Kale</h4>
-              <p className="text-xs text-gray-500 truncate">3rd Yr Student</p>
+              <h4 className="font-bold text-sm truncate">{username.charAt(0).toUpperCase() + username.slice(1)}</h4>
+              <p className="text-xs text-gray-500 truncate">{userData?.preparing_for || "Life OS User"}</p>
             </div>
           </div>
           {onBack && (
@@ -135,7 +137,7 @@ export default function Dashboard({ onBack }: DashboardProps) {
               className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-lg border border-white/10 hover:border-red-500/30 hover:bg-red-500/10 hover:text-red-400 transition text-xs font-semibold text-gray-400"
             >
               <LogOut size={14} />
-              Exit Dashboard
+              Log Out
             </button>
           )}
         </div>
