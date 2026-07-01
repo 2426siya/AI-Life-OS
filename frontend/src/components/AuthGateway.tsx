@@ -144,6 +144,9 @@ export default function AuthGateway({ onLoginSuccess }: AuthGatewayProps) {
                     className="w-full bg-[#08080A] border border-white/10 rounded-xl py-3 pl-12 pr-4 text-sm focus:border-violet-500 focus:outline-none transition-all placeholder:text-gray-600"
                   />
                 </div>
+                <p className="text-[10px] text-gray-500 mt-1.5 pl-1">
+                  Use your registered username (recommended to match GitHub) or email.
+                </p>
               </div>
 
               <div>
@@ -184,6 +187,9 @@ export default function AuthGateway({ onLoginSuccess }: AuthGatewayProps) {
                         className="w-full bg-[#08080A] border border-white/10 rounded-xl py-3 pl-12 pr-4 text-sm focus:border-violet-500 focus:outline-none transition-all placeholder:text-gray-600"
                       />
                     </div>
+                    <p className="text-[10px] text-violet-400/80 mt-1.5 pl-1 font-medium">
+                      Important: Enter your exact GitHub username to sync commits and PR stats!
+                    </p>
                   </div>
 
                   <div>
