@@ -10,33 +10,42 @@ export default function IntegrationsTab() {
   const [gitStats, setGitStats] = useState<any>(null);
   const [calEvents, setCalEvents] = useState<any[]>([]);
   
-  const [gitConnected, setGitConnected] = useState<boolean>(true);
-  const [calConnected, setCalConnected] = useState<boolean>(true);
+  const [gitConnected] = useState<boolean>(true);
+  const [calConnected, setCalConnected] = useState<boolean>(false);
+  const [loadingCal, setLoadingCal] = useState<boolean>(false);
 
   useEffect(() => {
-    // Fetch mock integrations data from backend
-    const f1 = fetch("/api/integrations/github").then(res => res.json()).catch(() => ({
-      username: "sunilkale",
-      commits_today: 3,
-      open_prs: 2,
-      issues_solved: 1,
-      streak_days: 17,
-      contributions_week: [1, 3, 0, 4, 2, 3, 1]
-    }));
+    // Fetch real integrations data from backend
+    fetch("/api/integrations/github")
+      .then(res => res.json())
+      .then(data => setGitStats(data))
+      .catch(() => {});
 
-    const f2 = fetch("/api/integrations/calendar").then(res => res.json()).catch(() => ({
-      provider: "Google Calendar",
-      events: [
-        { title: "Algorithms Class", time: "09:00 - 10:30", status: "Busy" },
-        { title: "ML Group Meeting", time: "14:00 - 15:00", status: "Tentative" }
-      ]
-    }));
-
-    Promise.all([f1, f2]).then(([git, cal]) => {
-      setGitStats(git);
-      setCalEvents(cal.events);
-    });
+    fetch("/api/integrations/calendar")
+      .then(res => res.json())
+      .then(data => {
+        setCalConnected(data.connected);
+        setCalEvents(data.events || []);
+      })
+      .catch(() => {});
   }, []);
+
+  const handleConnectCalendar = async () => {
+    setLoadingCal(true);
+    try {
+      const res = await fetch("/api/integrations/calendar/auth");
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.detail || "Failed to start Google OAuth.");
+      }
+      // Redirect browser to Google Sign-in screen
+      window.location.href = data.auth_url;
+    } catch (err: any) {
+      alert(`Google Calendar Setup Error:\n\n${err.message}`);
+    } finally {
+      setLoadingCal(false);
+    }
+  };
 
   return (
     <div className="space-y-8 animate-fadeIn">
@@ -68,14 +77,10 @@ export default function IntegrationsTab() {
             </div>
 
             <button
-              onClick={() => setGitConnected(!gitConnected)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
-                gitConnected 
-                  ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400" 
-                  : "bg-white/5 border-white/10 hover:border-violet-500/30 text-white"
-              }`}
+              disabled
+              className="px-3 py-1.5 rounded-lg text-xs font-semibold border bg-emerald-500/10 border-emerald-500/20 text-emerald-400 cursor-default"
             >
-              {gitConnected ? "Connected" : "Connect"}
+              Connected
             </button>
           </div>
 
@@ -150,14 +155,15 @@ export default function IntegrationsTab() {
             </div>
 
             <button
-              onClick={() => setCalConnected(!calConnected)}
+              onClick={handleConnectCalendar}
+              disabled={loadingCal || calConnected}
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
                 calConnected 
-                  ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400" 
-                  : "bg-white/5 border-white/10 hover:border-violet-500/30 text-white"
+                  ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400 cursor-default" 
+                  : "bg-white/5 border-white/10 hover:border-violet-500/30 text-white disabled:opacity-50"
               }`}
             >
-              {calConnected ? "Connected" : "Connect"}
+              {calConnected ? "Connected" : loadingCal ? "Connecting..." : "Connect"}
             </button>
           </div>
 
