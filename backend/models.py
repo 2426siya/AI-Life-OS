@@ -1,7 +1,7 @@
 from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime, Date, Boolean, Table
 from sqlalchemy.orm import relationship
 import datetime
-from .database import Base
+from backend.database import Base
 
 # Association table for composite task dependencies
 task_dependency = Table(

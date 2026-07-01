@@ -7,8 +7,8 @@ from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from typing import List, Dict, Any, Optional
 
-from .database import engine, get_db, Base
-from . import models, schemas, ai_engine
+from backend.database import engine, get_db, Base
+from backend import models, schemas, ai_engine
 
 app = FastAPI(title="Nexus AI - AI Life Operating System API")
 
