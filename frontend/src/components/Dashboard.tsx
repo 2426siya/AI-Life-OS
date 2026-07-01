@@ -24,7 +24,7 @@ import MentorTab from "./tabs/MentorTab";
 import PortfolioTab from "./tabs/PortfolioTab";
 
 interface DashboardProps {
-  onBack: () => void;
+  onBack?: () => void;
 }
 
 export default function Dashboard({ onBack }: DashboardProps) {
@@ -129,13 +129,15 @@ export default function Dashboard({ onBack }: DashboardProps) {
               <p className="text-xs text-gray-500 truncate">3rd Yr Student</p>
             </div>
           </div>
-          <button 
-            onClick={onBack}
-            className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-lg border border-white/10 hover:border-red-500/30 hover:bg-red-500/10 hover:text-red-400 transition text-xs font-semibold text-gray-400"
-          >
-            <LogOut size={14} />
-            Exit Dashboard
-          </button>
+          {onBack && (
+            <button 
+              onClick={onBack}
+              className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-lg border border-white/10 hover:border-red-500/30 hover:bg-red-500/10 hover:text-red-400 transition text-xs font-semibold text-gray-400"
+            >
+              <LogOut size={14} />
+              Exit Dashboard
+            </button>
+          )}
         </div>
       </aside>
 
