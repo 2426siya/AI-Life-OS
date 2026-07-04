@@ -108,11 +108,11 @@ def seed_user_data(db: Session, user_id: int):
         db.commit()
     
     # Link dependency (First PR task depends on Git task)
-    git_task = db.query(models.Task).join(models.Milestone).join(models.Goal).filter(
+    git_task = db.query(models.Task).join(models.Milestone, models.Task.milestone_id == models.Milestone.id).join(models.Goal, models.Milestone.goal_id == models.Goal.id).filter(
         models.Goal.user_id == user_id,
         models.Task.title.like("%Configure Git%")
     ).first()
-    pr_task = db.query(models.Task).join(models.Milestone).join(models.Goal).filter(
+    pr_task = db.query(models.Task).join(models.Milestone, models.Task.milestone_id == models.Milestone.id).join(models.Goal, models.Milestone.goal_id == models.Goal.id).filter(
         models.Goal.user_id == user_id,
         models.Task.title.like("%Submit first Pull Request%")
     ).first()
@@ -317,7 +317,7 @@ def create_task(task_in: schemas.TaskCreate, db: Session = Depends(get_db), curr
 
 @app.get("/api/tasks", response_model=List[schemas.TaskOut])
 def get_tasks(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
-    tasks = db.query(models.Task).join(models.Milestone).join(models.Goal).filter(
+    tasks = db.query(models.Task).join(models.Milestone, models.Task.milestone_id == models.Milestone.id).join(models.Goal, models.Milestone.goal_id == models.Goal.id).filter(
         models.Goal.user_id == current_user.id
     ).all()
     out = []
@@ -338,7 +338,7 @@ def get_tasks(db: Session = Depends(get_db), current_user: models.User = Depends
 
 @app.put("/api/tasks/{task_id}", response_model=schemas.TaskOut)
 def update_task(task_id: int, task_in: schemas.TaskUpdate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
-    task = db.query(models.Task).join(models.Milestone).join(models.Goal).filter(
+    task = db.query(models.Task).join(models.Milestone, models.Task.milestone_id == models.Milestone.id).join(models.Goal, models.Milestone.goal_id == models.Goal.id).filter(
         models.Task.id == task_id,
         models.Goal.user_id == current_user.id
     ).first()
@@ -406,11 +406,11 @@ def update_task(task_id: int, task_in: schemas.TaskUpdate, db: Session = Depends
 
 @app.post("/api/tasks/{task_id}/dependencies", response_model=schemas.TaskOut)
 def add_dependency(task_id: int, depends_on_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
-    task = db.query(models.Task).join(models.Milestone).join(models.Goal).filter(
+    task = db.query(models.Task).join(models.Milestone, models.Task.milestone_id == models.Milestone.id).join(models.Goal, models.Milestone.goal_id == models.Goal.id).filter(
         models.Task.id == task_id,
         models.Goal.user_id == current_user.id
     ).first()
-    dep_task = db.query(models.Task).join(models.Milestone).join(models.Goal).filter(
+    dep_task = db.query(models.Task).join(models.Milestone, models.Task.milestone_id == models.Milestone.id).join(models.Goal, models.Milestone.goal_id == models.Goal.id).filter(
         models.Task.id == depends_on_id,
         models.Goal.user_id == current_user.id
     ).first()
