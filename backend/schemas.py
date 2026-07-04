@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from typing import List, Optional
 import datetime
 
@@ -39,6 +39,15 @@ class TaskOut(TaskBase):
     priority_score: int
     created_at: datetime.datetime
     dependencies: List[int] = []  # List of task IDs this task depends on
+
+    @field_validator("dependencies", mode="before")
+    @classmethod
+    def serialize_dependencies(cls, v):
+        if not v:
+            return []
+        if isinstance(v, list):
+            return [d.id if hasattr(d, "id") else d for d in v]
+        return v
 
     class Config:
         from_attributes = True
