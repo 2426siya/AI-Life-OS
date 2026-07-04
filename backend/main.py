@@ -883,13 +883,28 @@ def get_calendar_auth_url(request: Request, current_user: models.User = Depends(
 def google_calendar_callback(request: Request, code: str, state: str, db: Session = Depends(get_db)):
     """
     Callback URL where Google redirects user after authorization.
-    Saves auth tokens to the database.
+    Exchanges the code for tokens via direct HTTP POST (bypassing stateful PKCE flow) and saves them.
     """
     redirect_uri = f"{request.url.scheme}://{request.url.netloc}/api/integrations/calendar/callback"
+    client_id = os.environ.get("GOOGLE_CLIENT_ID", "")
+    client_secret = os.environ.get("GOOGLE_CLIENT_SECRET", "")
+    
     try:
-        flow = get_google_auth_flow(redirect_uri)
-        flow.fetch_token(code=code)
-        credentials = flow.credentials
+        # Perform direct HTTP POST token exchange to bypass Flow PKCE code_verifier bugs
+        token_url = "https://oauth2.googleapis.com/token"
+        data = {
+            "code": code,
+            "client_id": client_id,
+            "client_secret": client_secret,
+            "redirect_uri": redirect_uri,
+            "grant_type": "authorization_code"
+        }
+        
+        res = httpx.post(token_url, data=data)
+        if res.status_code != 200:
+            return HTMLResponse(content=f"<h3>Token exchange failed</h3><p>{res.text}</p>", status_code=400)
+            
+        token_data = res.json()
         
         # 'state' contains the username of the user who started the authorization
         username = state
@@ -897,7 +912,28 @@ def google_calendar_callback(request: Request, code: str, state: str, db: Sessio
         if not user:
             return HTMLResponse(content="<h3>Error: User not found</h3>", status_code=404)
             
-        user.google_token_json = credentials.to_json()
+        # Preserve existing refresh token if Google did not re-send it
+        existing_refresh_token = None
+        if user.google_token_json:
+            try:
+                old_cred = json.loads(user.google_token_json)
+                existing_refresh_token = old_cred.get("refresh_token")
+            except Exception:
+                pass
+                
+        refresh_token = token_data.get("refresh_token") or existing_refresh_token
+        
+        # Structure matching google.oauth2.credentials.Credentials.from_authorized_user_info
+        credentials_dict = {
+            "token": token_data.get("access_token"),
+            "refresh_token": refresh_token,
+            "token_uri": "https://oauth2.googleapis.com/token",
+            "client_id": client_id,
+            "client_secret": client_secret,
+            "scopes": token_data.get("scope", "").split(" ")
+        }
+        
+        user.google_token_json = json.dumps(credentials_dict)
         db.commit()
         
         # Redirect the user back to the dashboard frontpage
