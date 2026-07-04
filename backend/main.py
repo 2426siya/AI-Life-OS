@@ -518,7 +518,7 @@ def get_dashboard_overview(db: Session = Depends(get_db), current_user: models.U
     }
     
     # 2. Fetch today's tasks (due today, pending, or overdue)
-    all_tasks = db.query(models.Task).join(models.Milestone).join(models.Goal).filter(
+    all_tasks = db.query(models.Task).join(models.Milestone, models.Task.milestone_id == models.Milestone.id).join(models.Goal, models.Milestone.goal_id == models.Goal.id).filter(
         models.Goal.user_id == current_user.id
     ).all()
     today_tasks = []
