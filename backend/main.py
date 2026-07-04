@@ -861,23 +861,33 @@ def get_google_auth_flow(redirect_uri: str) -> Flow:
 @app.get("/api/integrations/calendar/auth")
 def get_calendar_auth_url(request: Request, current_user: models.User = Depends(get_current_user)):
     """
-    Get Google OAuth consent page URL.
+    Get Google OAuth consent page URL. Constructs the URL manually to avoid PKCE challenges.
     """
-    # Construct redirect URI pointing to our callback endpoint
-    redirect_uri = f"{request.url.scheme}://{request.url.netloc}/api/integrations/calendar/callback"
-    try:
-        flow = get_google_auth_flow(redirect_uri)
-        authorization_url, _ = flow.authorization_url(
-            access_type="offline",
-            include_granted_scopes="true",
-            state=current_user.username,
-            prompt="consent"  # Ensure we get refresh token every time
+    import urllib.parse
+    client_id = os.environ.get("GOOGLE_CLIENT_ID", "")
+    client_secret = os.environ.get("GOOGLE_CLIENT_SECRET", "")
+    
+    if not client_id or not client_secret:
+        raise HTTPException(
+            status_code=400, 
+            detail="Google Client ID and Client Secret must be configured in environment variables."
         )
-        return {"auth_url": authorization_url}
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"OAuth Flow initialization failed: {e}")
+        
+    redirect_uri = f"{request.url.scheme}://{request.url.netloc}/api/integrations/calendar/callback"
+    scope = "https://www.googleapis.com/auth/calendar.events.readonly"
+    
+    params = {
+        "client_id": client_id,
+        "redirect_uri": redirect_uri,
+        "response_type": "code",
+        "scope": scope,
+        "access_type": "offline",
+        "state": current_user.username,
+        "prompt": "consent"
+    }
+    
+    auth_url = "https://accounts.google.com/o/oauth2/auth?" + urllib.parse.urlencode(params)
+    return {"auth_url": auth_url}
 
 @app.get("/api/integrations/calendar/callback")
 def google_calendar_callback(request: Request, code: str, state: str, db: Session = Depends(get_db)):
