@@ -193,6 +193,18 @@ def create_goal(goal_in: schemas.GoalCreate, db: Session = Depends(get_db), curr
     db.commit()
     db.refresh(goal)
     
+    # Parse deadline robustly to support different browser date formats and avoid 500 crashes
+    parsed_deadline = None
+    for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%m/%d/%Y", "%Y/%m/%d", "%d-%m-%Y"):
+        try:
+            parsed_deadline = datetime.datetime.strptime(goal.deadline.strip(), fmt).date()
+            break
+        except ValueError:
+            continue
+            
+    if not parsed_deadline:
+        parsed_deadline = datetime.date.today() + datetime.timedelta(days=90)
+    
     # Automatically decompose using the AI Engine
     decomp = ai_engine.decompose_goal(goal.title, goal.priority)
     for m_data in decomp["milestones"]:
@@ -210,7 +222,7 @@ def create_goal(goal_in: schemas.GoalCreate, db: Session = Depends(get_db), curr
         # Add Tasks for this milestone
         for t_idx, t_data in enumerate(m_data["tasks"]):
             due_days = (milestone.order - 1) * 7 + t_idx * 2
-            task_due = (datetime.datetime.strptime(goal.deadline, "%Y-%m-%d").date() - datetime.timedelta(days=(4 - milestone.order) * 14 + (2 - t_idx))).strftime("%Y-%m-%d")
+            task_due = (parsed_deadline - datetime.timedelta(days=(4 - milestone.order) * 14 + (2 - t_idx))).strftime("%Y-%m-%d")
             
             # Keep task due dates within bounds
             today_str = datetime.date.today().strftime("%Y-%m-%d")
