@@ -30,6 +30,7 @@ export default function GoalsTab({ apiError }: GoalsTabProps) {
   
   // UI State
   const [expandedGoalId, setExpandedGoalId] = useState<number | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const fetchGoals = () => {
     fetch("/api/goals")
@@ -102,6 +103,8 @@ export default function GoalsTab({ apiError }: GoalsTabProps) {
 
     const newGoalData = { title, description, deadline, priority };
 
+    setSubmitError(null);
+
     if (apiError) {
       // Mock local addition
       const mockGoal = {
@@ -131,7 +134,7 @@ export default function GoalsTab({ apiError }: GoalsTabProps) {
         body: JSON.stringify(newGoalData)
       })
       .then((res) => {
-        if (!res.ok) throw new Error();
+        if (!res.ok) throw new Error("Server rejected request with status: " + res.status);
         return res.json();
       })
       .then((data) => {
@@ -139,7 +142,10 @@ export default function GoalsTab({ apiError }: GoalsTabProps) {
         setExpandedGoalId(data.id);
         resetForm();
       })
-      .catch(() => {});
+      .catch((err) => {
+        console.error("Error creating goal:", err);
+        setSubmitError("Failed to initialize AI roadmap. Please verify server status and details.");
+      });
     }
   };
 
@@ -148,6 +154,7 @@ export default function GoalsTab({ apiError }: GoalsTabProps) {
     setDescription("");
     setDeadline("");
     setPriority("Medium");
+    setSubmitError(null);
     setShowAddForm(false);
   };
 
@@ -195,6 +202,13 @@ export default function GoalsTab({ apiError }: GoalsTabProps) {
             <Cpu className="text-violet-400" size={18} />
             Define Goal & Initialize AI Decomposition
           </h3>
+
+          {submitError && (
+            <div className="p-3.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs flex items-center gap-2.5">
+              <AlertCircle size={15} className="shrink-0" />
+              <span>{submitError}</span>
+            </div>
+          )}
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-1.5">

@@ -7,7 +7,10 @@ import {
   CheckCircle2, 
   Circle, 
   AlertTriangle,
-  Clock
+  Clock,
+  Plus,
+  PlusCircle,
+  AlertCircle
 } from "lucide-react";
 
 
@@ -19,6 +22,17 @@ export default function PlannerTab({ apiError }: PlannerTabProps) {
   const [tasks, setTasks] = useState<any[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [showWarning, setShowWarning] = useState<string | null>(null);
+
+  // Add Task Form State
+  const [showAddForm, setShowAddForm] = useState<boolean>(false);
+  const [goals, setGoals] = useState<any[]>([]);
+  const [taskTitle, setTaskTitle] = useState<string>("");
+  const [taskDuration, setTaskDuration] = useState<number>(30);
+  const [taskEnergy, setTaskEnergy] = useState<string>("Medium");
+  const [taskDueDate, setTaskDueDate] = useState<string>(new Date().toISOString().split("T")[0]);
+  const [selectedGoalId, setSelectedGoalId] = useState<number | "">("");
+  const [selectedMilestoneId, setSelectedMilestoneId] = useState<number | "">("");
+  const [addTaskError, setAddTaskError] = useState<string | null>(null);
 
   const fetchTasks = () => {
     fetch("/api/tasks")
@@ -46,6 +60,77 @@ export default function PlannerTab({ apiError }: PlannerTabProps) {
   useEffect(() => {
     fetchTasks();
   }, []);
+
+  useEffect(() => {
+    if (showAddForm) {
+      fetch("/api/goals")
+        .then(res => res.json())
+        .then(data => setGoals(data))
+        .catch(() => {});
+    }
+  }, [showAddForm]);
+
+  const handleAddTask = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!taskTitle || !taskDueDate || !selectedMilestoneId) {
+      setAddTaskError("Please fill out all required fields, including selecting a goal and milestone.");
+      return;
+    }
+
+    setAddTaskError(null);
+    const newTaskData = {
+      title: taskTitle,
+      duration_minutes: Number(taskDuration),
+      energy_required: taskEnergy,
+      due_date: taskDueDate,
+      milestone_id: Number(selectedMilestoneId)
+    };
+
+    if (apiError) {
+      // Mock local add
+      const mockTask = {
+        id: Date.now(),
+        ...newTaskData,
+        status: "Pending",
+        priority_score: 55,
+        dependencies: []
+      };
+      setTasks([mockTask, ...tasks]);
+      resetAddTaskForm();
+    } else {
+      fetch("/api/tasks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newTaskData)
+      })
+      .then((res) => {
+        if (!res.ok) throw new Error("Server rejected task creation.");
+        return res.json();
+      })
+      .then(() => {
+        fetchTasks();
+        resetAddTaskForm();
+      })
+      .catch((err) => {
+        console.error("Error creating task:", err);
+        setAddTaskError("Failed to add task. Please verify server status.");
+      });
+    }
+  };
+
+  const resetAddTaskForm = () => {
+    setTaskTitle("");
+    setTaskDuration(30);
+    setTaskEnergy("Medium");
+    setTaskDueDate(new Date().toISOString().split("T")[0]);
+    setSelectedGoalId("");
+    setSelectedMilestoneId("");
+    setAddTaskError(null);
+    setShowAddForm(false);
+  };
+
+  const selectedGoal = goals.find(g => g.id === Number(selectedGoalId));
+  const milestones = selectedGoal ? selectedGoal.milestones : [];
 
   const isTaskLocked = (task: any) => {
     if (!task.dependencies || task.dependencies.length === 0) return false;
@@ -161,12 +246,144 @@ export default function PlannerTab({ apiError }: PlannerTabProps) {
   return (
     <div className="space-y-6">
       {/* Description */}
-      <div>
-        <h1 className="text-2xl font-bold">Energy-Based Planner</h1>
-        <p className="text-gray-400 text-sm mt-1">
-          Nexus matches your peak energy hours to corresponding task workloads, implementing strict dependency lockouts to keep your work path chronological.
-        </p>
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-2xl font-bold">Energy-Based Planner</h1>
+          <p className="text-gray-400 text-sm mt-1">
+            Nexus matches your peak energy hours to corresponding task workloads, implementing strict dependency lockouts to keep your work path chronological.
+          </p>
+        </div>
+        <button
+          onClick={() => setShowAddForm(!showAddForm)}
+          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-violet-600 hover:bg-violet-700 font-semibold text-sm transition shrink-0"
+        >
+          <Plus size={16} />
+          Add Task
+        </button>
       </div>
+
+      {/* Add Task Form */}
+      {showAddForm && (
+        <form 
+          onSubmit={handleAddTask} 
+          className="p-6 rounded-2xl border border-white/10 bg-[#0C0C0E] space-y-4 animate-slideDown"
+        >
+          <h3 className="font-bold text-md flex items-center gap-2">
+            <PlusCircle className="text-violet-400" size={18} />
+            Create Custom Task
+          </h3>
+
+          {addTaskError && (
+            <div className="p-3.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs flex items-center gap-2.5">
+              <AlertCircle size={15} className="shrink-0" />
+              <span>{addTaskError}</span>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <label className="text-xs text-gray-400 font-semibold">Task Title</label>
+              <input
+                type="text"
+                placeholder="e.g. Practice Reading Module Part 1"
+                value={taskTitle}
+                onChange={(e) => setTaskTitle(e.target.value)}
+                required
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-violet-500"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <label className="text-xs text-gray-400 font-semibold">Duration (Minutes)</label>
+                <input
+                  type="number"
+                  min="5"
+                  max="480"
+                  value={taskDuration}
+                  onChange={(e) => setTaskDuration(Number(e.target.value))}
+                  required
+                  className="w-full bg-[#111115] border border-white/10 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-violet-500 text-gray-300"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs text-gray-400 font-semibold">Due Date</label>
+                <input
+                  type="date"
+                  value={taskDueDate}
+                  onChange={(e) => setTaskDueDate(e.target.value)}
+                  required
+                  className="w-full bg-[#111115] border border-white/10 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-violet-500 text-gray-300"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="space-y-1.5">
+              <label className="text-xs text-gray-400 font-semibold">Energy Level</label>
+              <select
+                value={taskEnergy}
+                onChange={(e) => setTaskEnergy(e.target.value)}
+                className="w-full bg-[#111115] border border-white/10 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-violet-500 text-gray-300"
+              >
+                <option value="High">High Energy (Morning)</option>
+                <option value="Medium">Medium Energy (Afternoon)</option>
+                <option value="Low">Low Energy (Night)</option>
+              </select>
+            </div>
+            
+            <div className="space-y-1.5">
+              <label className="text-xs text-gray-400 font-semibold">Target Goal</label>
+              <select
+                value={selectedGoalId}
+                onChange={(e) => {
+                  setSelectedGoalId(e.target.value === "" ? "" : Number(e.target.value));
+                  setSelectedMilestoneId("");
+                }}
+                required
+                className="w-full bg-[#111115] border border-white/10 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-violet-500 text-gray-300"
+              >
+                <option value="">-- Select Goal --</option>
+                {goals.map((g) => (
+                  <option key={g.id} value={g.id}>{g.title}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs text-gray-400 font-semibold">Target Milestone</label>
+              <select
+                value={selectedMilestoneId}
+                onChange={(e) => setSelectedMilestoneId(e.target.value === "" ? "" : Number(e.target.value))}
+                required
+                disabled={!selectedGoalId}
+                className="w-full bg-[#111115] border border-white/10 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-violet-500 text-gray-300 disabled:opacity-50"
+              >
+                <option value="">-- Select Milestone --</option>
+                {milestones.map((m: any) => (
+                  <option key={m.id} value={m.id}>{m.title}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-3 pt-2">
+            <button
+              type="button"
+              onClick={() => setShowAddForm(false)}
+              className="px-4 py-2 rounded-xl border border-white/10 hover:bg-white/5 text-sm font-semibold"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-5 py-2 rounded-xl bg-violet-600 hover:bg-violet-700 text-sm font-semibold"
+            >
+              Add Task
+            </button>
+          </div>
+        </form>
+      )}
 
       {/* Dependency lock warning toast */}
       {showWarning && (
