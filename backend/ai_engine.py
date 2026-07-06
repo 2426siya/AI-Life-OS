@@ -302,11 +302,11 @@ def generate_recovery_plan(missed_tasks: List[Dict[str, Any]]) -> List[Dict[str,
         
     return recovery_plan
 
-def get_mentor_response(user_msg: str, memory: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Simulates a highly personalized response from the AI Mentor.
-    Uses user interests, preparing_for, and goals stored in memory.
-    """
+import httpx
+import os
+import json
+
+def get_mentor_response_fallback(user_msg: str, memory: Dict[str, Any]) -> Dict[str, Any]:
     msg_lower = user_msg.lower()
     reply = ""
     memory_updates = None
@@ -376,3 +376,83 @@ def get_mentor_response(user_msg: str, memory: Dict[str, Any]) -> Dict[str, Any]
         "memory_updates": memory_updates,
         "recovery_plan": recovery_plan
     }
+
+def get_mentor_response(user_msg: str, memory: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Returns a highly personalized response from the AI Mentor.
+    Uses the real Gemini API if GEMINI_API_KEY is configured;
+    otherwise, falls back to the local keyword matching engine.
+    """
+    api_key = os.environ.get("GEMINI_API_KEY")
+    if not api_key:
+        return get_mentor_response_fallback(user_msg, memory)
+        
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+    
+    interests = memory.get("interests", "")
+    preparing_for = memory.get("preparing_for", "")
+    open_source_status = memory.get("open_source_status", "")
+    
+    system_instruction = f"""
+    You are the AI Career Mentor for NexusOS, a smart AI Life Operating System designed to help users track goals, plan tasks, and build their profiles.
+    Your tone is highly professional, encouraging, practical, and structured (like ChatGPT's advice style).
+    
+    The current user has the following profile details stored in database memory:
+    - Interests: "{interests if interests else "Not set yet"}"
+    - Preparing For: "{preparing_for if preparing_for else "Not set yet"}"
+    - Open Source Profile: "{open_source_status if open_source_status else "Not set yet"}"
+    
+    Provide a detailed, helpful conversational coaching response to the user's message.
+    
+    Database memory updates:
+    If the user mentions new or updated career interests, targets, or open source status during the conversation, you can suggest updating these fields. Suggest changes ONLY if the user explicitly mentions them or if they represent a natural addition based on the chat.
+    
+    Weekly task recovery:
+    If the user mentions being away, falling behind, or needing to catch up on their goals, design a 7-day Recovery Plan to help them catch up gradually without feeling overwhelmed.
+    
+    You MUST respond ONLY with a JSON object matching this structure:
+    {{
+        "reply": "your conversational response text using markdown formatting. Be detailed, encouraging, and write like a professional coach.",
+        "memory_updates": {{
+            "interests": "updated comma-separated list of interests (or null if no change)",
+            "preparing_for": "updated comma-separated list of goals/prep (or null if no change)",
+            "open_source_status": "updated status text (or null if no change)"
+        }},
+        "recovery_plan": [
+            {{"day": 1, "focus": "task description", "load": "estimated duration (e.g. 30 mins)"}},
+            ... (up to 7 days, or null if no recovery plan is generated)
+        ]
+    }}
+    """
+    
+    payload = {
+        "contents": [
+            {
+                "parts": [
+                    {"text": f"System: {system_instruction}\n\nUser: {user_msg}"}
+                ]
+            }
+        ],
+        "generationConfig": {
+            "responseMimeType": "application/json"
+        }
+    }
+    
+    try:
+        # SSL certificate validation is skipped locally if needed, but since httpx respects system certs
+        # we do a standard call. Timeout is set to 20 seconds.
+        with httpx.Client(verify=False) as client:
+            r = client.post(url, json=payload, timeout=20.0)
+            if r.status_code == 200:
+                res_data = r.json()
+                content_text = res_data["candidates"][0]["content"]["parts"][0]["text"]
+                parsed = json.loads(content_text.strip())
+                return {
+                    "reply": parsed.get("reply", ""),
+                    "memory_updates": parsed.get("memory_updates"),
+                    "recovery_plan": parsed.get("recovery_plan")
+                }
+    except Exception as e:
+        print(f"Error calling Gemini API: {e}")
+        
+    return get_mentor_response_fallback(user_msg, memory)
