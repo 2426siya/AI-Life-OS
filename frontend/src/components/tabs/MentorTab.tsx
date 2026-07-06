@@ -16,6 +16,31 @@ interface MentorTabProps {
   userData: any;
 }
 
+function parseMarkdown(text: string): string {
+  if (!text) return "";
+  let html = text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+
+  // Headers
+  html = html.replace(/^###\s+(.*?)$/gm, '<h4 class="font-extrabold text-white text-sm mt-3 mb-1">$1</h4>');
+  html = html.replace(/^##\s+(.*?)$/gm, '<h3 class="font-extrabold text-white text-md mt-4.5 mb-1.5">$1</h3>');
+  html = html.replace(/^#\s+(.*?)$/gm, '<h2 class="font-extrabold text-white text-lg mt-5 mb-2">$1</h2>');
+
+  // Bold
+  html = html.replace(/\*\*(.*?)\*\*/g, '<strong class="font-bold text-violet-300">$1</strong>');
+
+  // Italic
+  html = html.replace(/\*(.*?)\*/g, '<em class="italic">$1</em>');
+
+  // Lists
+  html = html.replace(/^\*\s+(.*?)$/gm, '<li class="ml-5 list-disc pl-0.5 my-0.5 text-gray-300">$1</li>');
+  html = html.replace(/^-\s+(.*?)$/gm, '<li class="ml-5 list-disc pl-0.5 my-0.5 text-gray-300">$1</li>');
+
+  return html;
+}
+
 export default function MentorTab({ apiError, userData }: MentorTabProps) {
   const [messages, setMessages] = useState<any[]>([
     { role: "mentor", content: "Hello! I am your AI Career Mentor. I track your career goals, analyze your workload capacities, and manage your accountability streaks. How can I help you today? You can ask me for career advice, or ask to generate a 'Recovery Plan' if you've been inactive." }
@@ -158,7 +183,14 @@ export default function MentorTab({ apiError, userData }: MentorTabProps) {
                     ? "bg-white/5 border border-white/5 text-gray-300" 
                     : "bg-violet-600 text-white font-medium"
                 }`}>
-                  <p className="whitespace-pre-line">{msg.content}</p>
+                  {isMentor ? (
+                    <div 
+                      className="space-y-1.5 whitespace-pre-line"
+                      dangerouslySetInnerHTML={{ __html: parseMarkdown(msg.content) }}
+                    />
+                  ) : (
+                    <p className="whitespace-pre-line">{msg.content}</p>
+                  )}
                 </div>
               </div>
             );
