@@ -276,9 +276,21 @@ def delete_goal(goal_id: int, db: Session = Depends(get_db), current_user: model
     goal = db.query(models.Goal).filter(models.Goal.id == goal_id, models.Goal.user_id == current_user.id).first()
     if not goal:
         raise HTTPException(status_code=404, detail="Goal not found")
-    db.delete(goal)
-    db.commit()
-    return {"message": "Goal deleted successfully"}
+        
+    try:
+        # Clear all task dependencies to avoid ForeignKeyViolations in self-referential many-to-many structures
+        for milestone in goal.milestones:
+            for task in milestone.tasks:
+                task.dependencies.clear()
+                task.dependent_on.clear()
+        db.commit()
+        
+        db.delete(goal)
+        db.commit()
+        return {"message": "Goal deleted successfully"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to delete goal: {e}")
 
 
 # --- Tasks Endpoints ---

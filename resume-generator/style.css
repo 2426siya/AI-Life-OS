@@ -1,0 +1,338 @@
+/* Reset and Box Model */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    width: 210mm;
+    height: 297mm;
+    font-family: 'Inter', sans-serif;
+    color: #1e293b; /* slate-800 */
+    background: #ffffff;
+    line-height: 1.35;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    overflow: hidden; /* Prevent any accidental page overflow */
+}
+
+/* Header Styling */
+.resume-header {
+    width: 100%;
+    height: 32mm;
+    background-color: #0f172a; /* slate-900 */
+    color: #ffffff;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 0 10mm;
+    text-align: center;
+}
+
+.name {
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: 1.5px;
+    margin-bottom: 4px;
+    color: #ffffff;
+}
+
+.contact-info {
+    font-size: 9.5px;
+    color: #cbd5e1; /* slate-300 */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.contact-info a {
+    color: #38bdf8; /* sky-400 */
+    text-decoration: none;
+    font-weight: 500;
+    transition: color 0.2s;
+}
+
+.contact-info a:hover {
+    color: #7dd3fc;
+}
+
+.bullet {
+    color: #64748b; /* slate-500 */
+}
+
+/* Layout Grid */
+.main-container {
+    display: flex;
+    width: 100%;
+    height: 265mm; /* 297mm - 32mm header */
+}
+
+/* Sidebar Styling (Left Column) */
+.sidebar {
+    width: 68mm;
+    height: 100%;
+    background-color: #f8fafc; /* slate-50 */
+    border-right: 1px solid #e2e8f0; /* slate-200 */
+    padding: 6mm 5mm;
+    display: flex;
+    flex-direction: column;
+    gap: 5mm;
+}
+
+/* Main Content Styling (Right Column) */
+.main-content {
+    width: 142mm;
+    height: 100%;
+    padding: 6mm 6mm;
+    display: flex;
+    flex-direction: column;
+    gap: 4.5mm;
+}
+
+/* Common Section Typography */
+.section-title {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    color: #0f172a; /* slate-900 */
+    border-bottom: 1.5px solid #cbd5e1; /* slate-300 */
+    padding-bottom: 2px;
+    margin-bottom: 6px;
+    text-transform: uppercase;
+}
+
+/* Sidebar Specific Sections */
+.sidebar-section {
+    display: flex;
+    flex-direction: column;
+}
+
+.sidebar-section .section-title {
+    color: #1e3a8a; /* deep blue */
+    border-bottom: 1.5px solid #bfdbfe; /* blue-200 */
+}
+
+/* Education Details */
+.education-item {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5px;
+}
+
+.edu-degree {
+    font-size: 9.5px;
+    font-weight: 700;
+    color: #1e293b;
+    line-height: 1.25;
+}
+
+.edu-school {
+    font-size: 9px;
+    font-weight: 500;
+    color: #475569;
+}
+
+.edu-location {
+    font-size: 8.5px;
+    color: #64748b;
+}
+
+.edu-date {
+    font-size: 8.5px;
+    color: #1e3a8a;
+    font-weight: 600;
+}
+
+.edu-gpa {
+    font-size: 9px;
+    color: #334155;
+    margin-top: 1px;
+}
+
+/* Technical Skills Grouping */
+.skill-group {
+    margin-bottom: 5px;
+}
+
+.skill-group:last-child {
+    margin-bottom: 0;
+}
+
+.skill-group-title {
+    font-size: 9px;
+    font-weight: 700;
+    color: #1e3a8a;
+    margin-bottom: 1px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.skill-list {
+    font-size: 8.5px;
+    color: #334155;
+    line-height: 1.3;
+}
+
+/* Achievements List */
+.sidebar-list {
+    list-style-type: none;
+}
+
+.sidebar-list li {
+    font-size: 8.5px;
+    color: #334155;
+    margin-bottom: 4px;
+    position: relative;
+    padding-left: 8px;
+    line-height: 1.3;
+}
+
+.sidebar-list li::before {
+    content: "•";
+    color: #1e3a8a;
+    font-weight: bold;
+    position: absolute;
+    left: 0;
+}
+
+.languages-text {
+    font-size: 8.5px;
+    color: #334155;
+    line-height: 1.3;
+}
+
+/* Main Content Specific Sections */
+.main-section {
+    display: flex;
+    flex-direction: column;
+}
+
+/* Profile Summary Section */
+.profile-summary {
+    font-size: 9px;
+    color: #334155;
+    text-align: justify;
+    line-height: 1.4;
+}
+
+/* Project Styling */
+.project-item {
+    margin-bottom: 5px;
+}
+
+.project-item:last-child {
+    margin-bottom: 0;
+}
+
+.project-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 1.5px;
+}
+
+.project-name {
+    font-size: 9.5px;
+    font-weight: 700;
+    color: #0f172a;
+}
+
+.project-link {
+    font-size: 8.5px;
+    color: #2563eb; /* blue-600 */
+    text-decoration: none;
+    font-weight: 500;
+}
+
+.project-link:hover {
+    text-decoration: underline;
+}
+
+.project-bullets {
+    padding-left: 12px;
+}
+
+.project-bullets li, .exp-bullets li {
+    font-size: 8.5px;
+    color: #334155;
+    margin-bottom: 1px;
+    line-height: 1.35;
+    text-align: justify;
+}
+
+.project-bullets li:last-child, .exp-bullets li:last-child {
+    margin-bottom: 0;
+}
+
+/* Experience Styling */
+.experience-item {
+    margin-bottom: 4px;
+}
+
+.experience-item:last-child {
+    margin-bottom: 0;
+}
+
+.experience-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+}
+
+.role {
+    font-size: 9.5px;
+    font-weight: 700;
+    color: #0f172a;
+}
+
+.dates {
+    font-size: 8.5px;
+    font-weight: 600;
+    color: #475569;
+}
+
+.organization {
+    font-size: 9px;
+    font-weight: 600;
+    color: #1e3a8a;
+    margin-bottom: 1.5px;
+}
+
+.exp-bullets {
+    padding-left: 12px;
+}
+
+/* Print Optimization */
+@media print {
+    body {
+        width: 210mm;
+        height: 297mm;
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+    }
+    
+    .resume-header {
+        background-color: #0f172a !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+    
+    .sidebar {
+        background-color: #f8fafc !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+    
+    .contact-info a {
+        color: #0284c7 !important;
+    }
+    
+    .project-link {
+        color: #1d4ed8 !important;
+    }
+}
