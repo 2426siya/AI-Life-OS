@@ -387,7 +387,7 @@ def get_mentor_response(user_msg: str, memory: Dict[str, Any]) -> Dict[str, Any]
     if not api_key:
         return get_mentor_response_fallback(user_msg, memory)
         
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
     
     interests = memory.get("interests", "")
     preparing_for = memory.get("preparing_for", "")
